@@ -2,7 +2,7 @@ GOCMD=go
 GOBUILD=$(GOCMD) build
 
 build-server:
-	cd cmd/server && $(GOBUILD) -o /go/bin/go-cli-chat-server
+	$(GOBUILD) -o bin/server cmd/server/main.go
 
 build-client:
-	cd cmd/client && $(GOBUILD) -o /go/bin/go-cli-chat-client
+	$(GOBUILD) -o bin/client cmd/client/main.go

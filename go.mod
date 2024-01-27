@@ -1,8 +1,9 @@
-module github.com/lmikolajczak/go-cli-chat
+module github.com/chekulaevanton/go-cli-chat
 
 go 1.20
 
 require (
+	github.com/google/uuid v1.6.0
 	github.com/jroimartin/gocui v0.5.0
 	golang.org/x/net v0.8.0
 )

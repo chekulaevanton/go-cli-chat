@@ -2,29 +2,18 @@ package main
 
 import (
 	"log"
-	"os"
 
-	"github.com/lmikolajczak/go-cli-chat/pkg/frontend"
+	"github.com/chekulaevanton/go-cli-chat/internal/client"
 )
 
 func main() {
-	ui, err := frontend.NewUI()
+	app, err := client.NewApp()
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer ui.Close()
+	defer app.Close()
 
-	username := os.Args[1]
-	ui.SetUsername(username)
-
-	if err = ui.Connect(username); err != nil {
-		log.Fatal(err)
-	}
-
-	ui.SetManagerFunc(ui.Layout)
-	ui.SetKeyBindings(ui.Gui)
-
-	if err = ui.Serve(); err != nil {
+	if err = app.Serve(); err != nil {
 		log.Fatal(err)
 	}
 }
