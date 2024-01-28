@@ -550,7 +550,7 @@ func (a *App) ReadMessage() error {
 }
 
 func (a *App) Quit(_ *gocui.Gui, _ *gocui.View) error {
-	// TODO: disconnect
+	a.conn.Close()
 	a.c()
 	return gocui.ErrQuit
 }
