@@ -149,15 +149,15 @@ func (s *Server) read(conn *connection.Conn) error {
 						}.SetTimestamp(time.Now()))
 						return err
 					}
-				}
-
-				err = conn.Send(message.Message{
-					Type:     message.TypeJoin,
-					Username: m.Username,
-					Payload:  fmt.Sprintf("Joined! Your username is %q.", m.Username),
-				}.SetTimestamp(time.Now()))
-				if err != nil {
-					return err
+				} else {
+					err = conn.Send(message.Message{
+						Type:     message.TypeJoin,
+						Username: m.Username,
+						Payload:  fmt.Sprintf("Joined! Your username is %q.", m.Username),
+					}.SetTimestamp(time.Now()))
+					if err != nil {
+						return err
+					}
 				}
 
 			case message.TypeLeave:
@@ -177,14 +177,14 @@ func (s *Server) read(conn *connection.Conn) error {
 						}.SetTimestamp(time.Now()))
 						return err
 					}
-				}
-
-				err = conn.Send(message.Message{
-					Type:    message.TypeLeave,
-					Payload: "Left!",
-				}.SetTimestamp(time.Now()))
-				if err != nil {
-					return err
+				} else {
+					err = conn.Send(message.Message{
+						Type:    message.TypeLeave,
+						Payload: "Left!",
+					}.SetTimestamp(time.Now()))
+					if err != nil {
+						return err
+					}
 				}
 
 			case message.TypeReq:
@@ -273,15 +273,15 @@ func (s *Server) read(conn *connection.Conn) error {
 						}.SetTimestamp(time.Now()))
 						return err
 					}
-				}
-
-				err = conn.Send(message.Message{
-					Type:     message.TypeAccept,
-					Username: m.Username,
-					Payload:  "Accepted!",
-				}.SetTimestamp(time.Now()))
-				if err != nil {
-					return err
+				} else {
+					err = conn.Send(message.Message{
+						Type:     message.TypeAccept,
+						Username: m.Username,
+						Payload:  "Accepted!",
+					}.SetTimestamp(time.Now()))
+					if err != nil {
+						return err
+					}
 				}
 
 			case message.TypeDeny:
@@ -317,15 +317,15 @@ func (s *Server) read(conn *connection.Conn) error {
 						}.SetTimestamp(time.Now()))
 						return err
 					}
-				}
-
-				err = conn.Send(message.Message{
-					Type:     message.TypeDeny,
-					Username: m.Username,
-					Payload:  "Denied!",
-				}.SetTimestamp(time.Now()))
-				if err != nil {
-					return err
+				} else {
+					err = conn.Send(message.Message{
+						Type:     message.TypeDeny,
+						Username: m.Username,
+						Payload:  "Denied!",
+					}.SetTimestamp(time.Now()))
+					if err != nil {
+						return err
+					}
 				}
 
 			case message.TypeEnd:
@@ -353,14 +353,14 @@ func (s *Server) read(conn *connection.Conn) error {
 						}.SetTimestamp(time.Now()))
 						return err
 					}
-				}
-
-				err = conn.Send(message.Message{
-					Type:    message.TypeEnd,
-					Payload: "Ended!",
-				}.SetTimestamp(time.Now()))
-				if err != nil {
-					return err
+				} else {
+					err = conn.Send(message.Message{
+						Type:    message.TypeEnd,
+						Payload: "Ended!",
+					}.SetTimestamp(time.Now()))
+					if err != nil {
+						return err
+					}
 				}
 
 			case message.TypeMessage:
@@ -490,8 +490,14 @@ func (s *Server) Leave(conn *connection.Conn) error {
 		if u1.ChatWith != nil {
 			u2 := u1.ChatWith
 
-			u1.Conn.Send(message.Message{Type: message.TypeEnd})
-			err2 := u2.Conn.Send(message.Message{Type: message.TypeEnd})
+			u1.Conn.Send(message.Message{
+				Type:    message.TypeEnd,
+				Payload: fmt.Sprintf("Chat with %q has ended", u2.Username),
+			}.SetTimestamp(time.Now()))
+			err2 := u2.Conn.Send(message.Message{
+				Type:    message.TypeEnd,
+				Payload: fmt.Sprintf("Chat with %q has ended", u1.Username),
+			}.SetTimestamp(time.Now()))
 
 			u1.ChatWith = nil
 			u2.ChatWith = nil
@@ -715,12 +721,7 @@ func (s *Server) Message(conn *connection.Conn, m message.Message) error {
 		Type:     message.TypeMessage,
 		Username: u1.Username,
 		Payload:  m.Payload,
-	})
-	u1.Conn.Send(message.Message{
-		Type:     message.TypeMessage,
-		Username: u1.Username,
-		Payload:  m.Payload,
-	})
+	}.SetTimestamp(time.Now()))
 
 	return nil
 }

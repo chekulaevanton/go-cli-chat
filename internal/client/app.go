@@ -13,6 +13,7 @@ import (
 	"golang.org/x/net/websocket"
 
 	"github.com/chekulaevanton/go-cli-chat/internal/pkg/connection"
+	"github.com/chekulaevanton/go-cli-chat/internal/pkg/crypter"
 	"github.com/chekulaevanton/go-cli-chat/internal/pkg/message"
 )
 
@@ -74,10 +75,12 @@ type App struct {
 	reqs map[string]string
 	mu   sync.Mutex
 
-	pub string // Отдаем для шифровки
-	pr  string // Расшифровываем
+	cr *crypter.Crypter
 
-	pubChat string // Шифруем для отправки
+	pub string
+	pr  string
+
+	pubChat string
 }
 
 func NewApp() (*App, error) {
@@ -88,7 +91,7 @@ func NewApp() (*App, error) {
 
 	ctx, c := context.WithCancel(context.Background())
 
-	ui := &App{
+	app := &App{
 		ctx: ctx,
 		c:   c,
 
@@ -96,14 +99,21 @@ func NewApp() (*App, error) {
 		state: StateDisconnected,
 
 		reqs: make(map[string]string),
+
+		cr: crypter.New(),
 	}
 
-	ui.tui.SetManagerFunc(ui.Layout)
-	if err = ui.SetKeyBindings(ui.tui); err != nil {
+	app.pub, app.pr, err = app.cr.GenKeys()
+	if err != nil {
 		return nil, err
 	}
 
-	return ui, nil
+	app.tui.SetManagerFunc(app.Layout)
+	if err = app.SetKeyBindings(app.tui); err != nil {
+		return nil, err
+	}
+
+	return app, nil
 }
 
 func (a *App) Layout(g *gocui.Gui) error {
@@ -217,6 +227,8 @@ func (a *App) WriteCommand(_ *gocui.Gui, v *gocui.View) error {
 
 	if a.state == StateWaitingChat {
 		a.writeNow(msgs, UserSystem, "Waiting...")
+		v.SetCursor(0, 0)
+		v.Clear()
 		return nil
 	}
 
@@ -282,6 +294,7 @@ func (a *App) WriteCommand(_ *gocui.Gui, v *gocui.View) error {
 				err = a.conn.Send(message.Message{
 					Type:     message.TypeAccept,
 					Username: args[1],
+					Payload:  a.pub,
 				})
 				if err != nil {
 					a.writeNow(msgs, UserSystem, fmt.Sprintf("Accept failed: %s", err))
@@ -391,14 +404,21 @@ func (a *App) WriteCommand(_ *gocui.Gui, v *gocui.View) error {
 	} else {
 		switch a.state {
 		case StateInChat:
-			err = a.conn.Send(message.Message{
-				Type:     message.TypeMessage,
-				Username: a.username,
-				Payload:  command,
-			})
+
+			encrypted, err := a.cr.Encrypt(command, a.pubChat)
 			if err != nil {
-				a.writeNow(msgs, UserSystem, fmt.Sprintf("Message sending failed: %s", err))
+				a.writeNow(msgs, UserSystem, fmt.Sprintf("Message sending failed: %s %s", err, a.pubChat))
+			} else {
+				err = a.conn.Send(message.Message{
+					Type:     message.TypeMessage,
+					Username: a.username,
+					Payload:  encrypted,
+				})
+				if err != nil {
+					a.writeNow(msgs, UserSystem, fmt.Sprintf("Message sending failed: %s", err))
+				}
 			}
+			a.writeNow(msgs, a.username, command)
 
 		case StateJoined:
 			a.writeNow(msgs, UserSystem, "Joined. Start chat first.")
@@ -495,15 +515,15 @@ func (a *App) ReadMessage() error {
 				case message.TypeAccept:
 					switch m.Payload {
 					case "Accepted!":
-						a.reqs = make(map[string]string)
 						a.pubChat = a.reqs[m.Username]
+						a.reqs = make(map[string]string)
 						a.state = StateInChat
 						msgs.Clear()
 						a.writeNow(msgs, UserServer, "Started chat with "+m.Username)
 
 					default:
-						a.reqs = make(map[string]string)
 						a.pubChat = m.Payload
+						a.reqs = make(map[string]string)
 						a.state = StateInChat
 						msgs.Clear()
 						a.writeNow(msgs, UserServer, "Started chat with "+m.Username)
@@ -515,7 +535,12 @@ func (a *App) ReadMessage() error {
 					a.state = StateJoined
 
 				case message.TypeMessage:
-					a.write(msgs, m.Time(), m.Username, m.Payload)
+					decrypted, err := a.cr.Decrypt(m.Payload, a.pr)
+					if err != nil {
+						a.writeNow(msgs, UserSystem, fmt.Sprintf("Message receiving failed: %s", err))
+					} else {
+						a.write(msgs, m.Time(), m.Username, decrypted)
+					}
 				}
 
 				return nil
@@ -562,13 +587,19 @@ func (a *App) StateToDisconnected() {
 	a.conn.Close()
 	a.conn = nil
 	a.state = StateDisconnected
+	a.username = ""
 	a.tui.Update(func(g *gocui.Gui) error {
 		msgs, err := a.tui.View(MessageWidget)
 		if err != nil {
 			return err
 		}
+		users, err := a.tui.View(UsersWidget)
+		if err != nil {
+			return err
+		}
 
 		a.writeNow(msgs, UserSystem, "Disconnected!")
+		users.Clear()
 
 		return nil
 	})

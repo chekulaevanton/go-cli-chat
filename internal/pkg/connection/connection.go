@@ -1,6 +1,8 @@
 package connection
 
 import (
+	"errors"
+
 	"github.com/google/uuid"
 	"golang.org/x/net/websocket"
 
@@ -20,10 +22,17 @@ func New(c *websocket.Conn) *Conn {
 }
 
 func (c *Conn) Send(m message.Message) error {
+	if c.conn == nil {
+		return errors.New("conn closed")
+	}
 	return websocket.JSON.Send(c.conn, m)
 }
 
 func (c *Conn) Read() (message.Message, error) {
+	if c.conn == nil {
+		return message.Message{}, errors.New("conn closed")
+	}
+
 	var m message.Message
 
 	if err := websocket.JSON.Receive(c.conn, &m); err != nil {
