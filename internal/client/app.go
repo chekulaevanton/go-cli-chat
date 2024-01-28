@@ -383,9 +383,7 @@ func (a *App) WriteCommand(_ *gocui.Gui, v *gocui.View) error {
 			fallthrough
 		case StateJoined:
 			a.writeNow(msgs, UserSystem, "Leaving...")
-			err = a.conn.Send(message.Message{
-				Type: message.TypeLeave,
-			})
+			err = a.conn.Send(message.Message{Type: message.TypeLeave})
 			if err != nil {
 				a.writeNow(msgs, UserSystem, fmt.Sprintf("Leaving failed: %s", err))
 			}
@@ -478,7 +476,7 @@ func (a *App) ReadMessage() error {
 				case message.TypeLeave:
 					a.write(msgs, m.Time(), UserServer, m.Payload)
 					a.username = ""
-					a.pr = ""
+					a.pubChat = ""
 					a.state = StateConnected
 					a.conn.Send(message.Message{Type: message.TypeStatus})
 
@@ -532,6 +530,7 @@ func (a *App) ReadMessage() error {
 
 				case message.TypeEnd:
 					a.write(msgs, m.Time(), UserServer, m.Payload)
+					a.pubChat = ""
 					a.state = StateJoined
 
 				case message.TypeMessage:
@@ -550,7 +549,10 @@ func (a *App) ReadMessage() error {
 }
 
 func (a *App) Quit(_ *gocui.Gui, _ *gocui.View) error {
-	a.conn.Close()
+	if a.conn != nil {
+		a.conn.Close()
+		a.conn = nil
+	}
 	a.c()
 	return gocui.ErrQuit
 }
